@@ -1,34 +1,58 @@
 
+import { isLoading } from "expo-font";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { loginUser } from "../services/api";
+
+
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = () => {
-    if (!email.trim() || !password) {
-      Alert.alert("Missing details", "Please enter your email and password.");
+  const handleLogin = async() => {
+    const identifier = email.trim();
+
+    if (!identifier || !password){
+      Alert.alert("missing details", "Enter your username/email and password.");
+
       return;
     }
 
-    // Connect your authentication API here.
-    Alert.alert("Login", "Connect your backend authentication endpoint here.");
+    if(isLoading) return;
+    try{
+      setIsLoading(true);
+      const result = await loginUser(identifier, password);
+
+      if (!result?.access_token || !result?.user){
+        throw new Error("The server returned an invalid login response.");
+
+      }
+      
+      Alert.alert("Welcome back!", `Hello, ${result.user.first_name || result.username}!`);
+      router.replace("/dashboard");
+    }catch (error){
+      Alert.alert("Login failed", error.message || "Please try again.");
+    }finally{
+      setIsLoading(false)
+    }
+
   };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -78,7 +102,7 @@ export default function LoginScreen() {
 
           {/* Login form */}
           <View style={styles.form}>
-            <Text style={styles.label}>Email Address</Text>
+            <Text style={styles.label}>Username or Email</Text>
             <View style={styles.inputContainer}>
               <Ionicons
                 name="mail-outline"
@@ -141,11 +165,12 @@ export default function LoginScreen() {
             style={styles.button}
             onPress={handleLogin}
             activeOpacity={0.85}
+            disabled={isLoading}
           >
-            <Text style={styles.buttonText}
-            onPress={() => router.push("/dashboard")}
-            >Login</Text>
-            <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>
+              {isLoading ? "Logging in.." : "Login"}
+            </Text>
+            <Ionicons name="arrow-forward" size={20} color="#FFFFFF"/>
           </TouchableOpacity>
 
           {/* Registration link */}
