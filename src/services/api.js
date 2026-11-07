@@ -31,14 +31,21 @@ export async function apiRequest(path, options = {}) {
 
     const data = await response.json().catch(() => null);
 
-    if (!response.ok) {
-      const message =
-        typeof data?.detail === "string"
-          ? data.detail
-          : `Request failed with status ${response.status}`;
+  if (!response.ok) {
+  console.error("API ERROR:", {
+    status: response.status,
+    response: data,
+  });
 
-      throw new Error(message);
-    }
+  const message =
+    typeof data?.detail === "string"
+      ? data.detail
+      : typeof data?.message === "string"
+      ? data.message
+      : `Request failed with status ${response.status}`;
+
+  throw new Error(message);
+}
 
     return data;
   } catch (error) {
@@ -66,4 +73,8 @@ export async function loginUser(identifier, password) {
       password,
     }),
   });
+}
+
+export async function getClasses(){
+  return apiRequest("/api/academics/classes");
 }

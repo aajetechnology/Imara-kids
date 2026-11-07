@@ -1,9 +1,11 @@
 
 import { Stack } from "expo-router";
+import { RegistrationProvider } from "../context/RegisterationContext";
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <RegistrationProvider>
+      <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="welcome" />
       <Stack.Screen name="student-details" />
@@ -19,5 +21,6 @@ export default function RootLayout() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="parent-controls"/>
     </Stack>
+    </RegistrationProvider>
   );
 }

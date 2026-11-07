@@ -1,42 +1,92 @@
-
-import { useState } from "react";
-import {
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
-
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { images } from "../constants/images";
+import { getClasses } from "../services/api";
 
-const classes = [
-  { id: "nursery_1", name: "Nursery 1", image: images.nursery1, group: "NURSERY" },
-  { id: "nursery_2", name: "Nursery 2", image: images.nursery2, group: "NURSERY" },
-  { id: "primary_1", name: "Primary 1", image: images.primary1, group: "PRIMARY" },
-  { id: "primary_2", name: "Primary 2", image: images.primary2, group: "PRIMARY" },
-  { id: "primary_3", name: "Primary 3", image: images.primary3, group: "PRIMARY" },
-  { id: "primary_4", name: "Primary 4", image: images.primary4, group: "PRIMARY" },
-  { id: "primary_5", name: "Primary 5", image: images.primary5, group: "PRIMARY" },
-];
+// Match backend class names to your existing local images.
+const classImages = {
+  "Nursery 1": images.nursery1,
+  "Nursery 2": images.nursery2,
+  "Primary 1": images.primary1,
+  "Primary 2": images.primary2,
+  "Primary 3": images.primary3,
+  "Primary 4": images.primary4,
+  "Primary 5": images.primary5,
+};
 
 export default function SelectClassScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  const [selectedClass, setSelectedClass] = useState(
-    Array.isArray(params.classId) ? params.classId[0] : params.classId || null
-  );
+  const [classes, setClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
+  // Load classes from the backend.
+  const loadClasses = async () => {
+    try {
+      setIsLoading(true);
+      setLoadError("");
+
+      const response = await getClasses();
+
+      if (!Array.isArray(response)) {
+        throw new Error("Invalid class list received from the server.");
+      }
+
+      const formattedClasses = response.map((item) => ({
+        id: String(item.id),
+        name: item.name,
+        image: classImages[item.name],
+        group: item.section?.toUpperCase() || "",
+      }));
+
+      setClasses(formattedClasses);
+
+      // Keep a previously selected class if it still exists.
+      const previousClassId = Array.isArray(params.classId)
+        ? params.classId[0]
+        : params.classId;
+
+      if (
+        previousClassId &&
+        formattedClasses.some((item) => item.id === String(previousClassId))
+      ) {
+        setSelectedClass(String(previousClassId));
+      }
+    } catch (error) {
+      console.error("Class loading error:", error);
+      setLoadError(error.message || "Unable to load classes. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadClasses();
+  }, []);
+
+  // Continue after selecting a class.
   const handleContinue = () => {
     if (!selectedClass) return;
 
-    const chosenClass = classes.find((item) => item.id === selectedClass);
+    const chosenClass = classes.find(
+      (item) => item.id === selectedClass
+    );
+
     if (!chosenClass) return;
 
     router.push({
@@ -65,6 +115,7 @@ export default function SelectClassScreen() {
 
         <View style={styles.stepWrapper}>
           <Text style={styles.stepText}>STEP 2 OF 3</Text>
+
           <View style={styles.progressTrack}>
             <View style={styles.progressFill} />
           </View>
@@ -83,10 +134,12 @@ export default function SelectClassScreen() {
         <View style={styles.titleRow}>
           <View style={styles.titleContainer}>
             <Text style={styles.eyebrow}>YOUR LEARNING JOURNEY</Text>
+
             <Text style={styles.title}>
               Select Your{"\n"}
               <Text style={styles.titleAccent}>Class</Text>
             </Text>
+
             <Text style={styles.subtitle}>
               Which class are you in? Choose one to get started.
             </Text>
@@ -104,6 +157,7 @@ export default function SelectClassScreen() {
           <View style={styles.helperIcon}>
             <Ionicons name="school-outline" size={20} color="#00834C" />
           </View>
+
           <Text style={styles.helperText}>
             Pick the class you are currently attending.
           </Text>
@@ -113,61 +167,123 @@ export default function SelectClassScreen() {
         <View style={styles.classList}>
           <Text style={styles.sectionTitle}>Nursery & Primary</Text>
 
-          {classes.map((item, index) => {
-            const isSelected = selectedClass === item.id;
+          {/* Loading state */}
+          {isLoading && (
+            <View style={styles.stateContainer}>
+              <ActivityIndicator size="large" color="#00834C" />
+              <Text style={styles.stateText}>
+                Loading available classes...
+              </Text>
+            </View>
+          )}
 
-            return (
+          {/* Error state */}
+          {!isLoading && loadError !== "" && (
+            <View style={styles.stateContainer}>
+              <Ionicons
+                name="cloud-offline-outline"
+                size={35}
+                color="#D97757"
+              />
+
+              <Text style={styles.errorText}>{loadError}</Text>
+
               <TouchableOpacity
-                key={item.id}
-                activeOpacity={0.82}
-                onPress={() => setSelectedClass(item.id)}
-                style={[
-                  styles.classItem,
-                  isSelected && styles.selectedClassItem,
-                ]}
+                style={styles.retryButton}
+                onPress={loadClasses}
+                activeOpacity={0.8}
               >
-                <View
+                <Ionicons name="refresh" size={16} color="#FFFFFF" />
+                <Text style={styles.retryText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Empty state */}
+          {!isLoading && !loadError && classes.length === 0 && (
+            <View style={styles.stateContainer}>
+              <Ionicons
+                name="school-outline"
+                size={35}
+                color="#829087"
+              />
+              <Text style={styles.stateText}>
+                No classes are currently available.
+              </Text>
+            </View>
+          )}
+
+          {/* Dynamic classes from backend */}
+          {!isLoading &&
+            !loadError &&
+            classes.map((item) => {
+              const isSelected = selectedClass === item.id;
+
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.82}
+                  onPress={() => setSelectedClass(item.id)}
                   style={[
-                    styles.animalContainer,
-                    isSelected && styles.selectedAnimalContainer,
+                    styles.classItem,
+                    isSelected && styles.selectedClassItem,
                   ]}
                 >
-                  <Image
-                    source={item.image}
-                    style={styles.animal}
-                    resizeMode="contain"
-                  />
-                </View>
-
-                <View style={styles.classInfo}>
-                  <Text
+                  <View
                     style={[
-                      styles.className,
-                      isSelected && styles.selectedClassName,
+                      styles.animalContainer,
+                      isSelected && styles.selectedAnimalContainer,
                     ]}
                   >
-                    {item.name}
-                  </Text>
-                  <Text style={styles.classDescription}>
-                    {item.group === "NURSERY"
-                      ? "Let's learn and play"
-                      : "Ready to explore and grow"}
-                  </Text>
-                </View>
+                    {item.image ? (
+                      <Image
+                        source={item.image}
+                        style={styles.animal}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Ionicons
+                        name="school-outline"
+                        size={30}
+                        color="#00834C"
+                      />
+                    )}
+                  </View>
 
-                <View
-                  style={[
-                    styles.radio,
-                    isSelected && styles.radioSelected,
-                  ]}
-                >
-                  {isSelected && (
-                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+                  <View style={styles.classInfo}>
+                    <Text
+                      style={[
+                        styles.className,
+                        isSelected && styles.selectedClassName,
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+
+                    <Text style={styles.classDescription}>
+                      {item.group === "NURSERY"
+                        ? "Let's learn and play"
+                        : "Ready to explore and grow"}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.radio,
+                      isSelected && styles.radioSelected,
+                    ]}
+                  >
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark"
+                        size={14}
+                        color="#FFFFFF"
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
         </View>
 
         <View style={styles.bottomSpace} />
@@ -177,24 +293,29 @@ export default function SelectClassScreen() {
       <View style={styles.bottomBar}>
         {selectedClass ? (
           <Text style={styles.selectedHint}>
-            Selected: {classes.find((item) => item.id === selectedClass)?.name}
+            Selected:{" "}
+            {classes.find((item) => item.id === selectedClass)?.name}
           </Text>
         ) : (
           <Text style={styles.selectedHint}>
-            Please select your current class
+            {isLoading
+              ? "Loading classes..."
+              : "Please select your current class"}
           </Text>
         )}
 
         <TouchableOpacity
           style={[
             styles.continueButton,
-            !selectedClass && styles.disabledButton,
+            (!selectedClass || isLoading || loadError) &&
+              styles.disabledButton,
           ]}
           onPress={handleContinue}
-          disabled={!selectedClass}
+          disabled={!selectedClass || isLoading || !!loadError}
           activeOpacity={0.85}
         >
           <Text style={styles.continueText}>Continue</Text>
+
           <View style={styles.arrowCircle}>
             <Ionicons name="arrow-forward" size={17} color="#00834C" />
           </View>
@@ -221,6 +342,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+
   backButton: {
     width: 42,
     height: 42,
@@ -231,18 +353,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   stepWrapper: {
     flex: 1,
     alignItems: "center",
     marginHorizontal: 20,
     gap: 6,
   },
+
   stepText: {
     fontSize: 9,
     color: "#829087",
     fontWeight: "800",
     letterSpacing: 1.3,
   },
+
   progressTrack: {
     height: 5,
     width: 105,
@@ -250,12 +375,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: "hidden",
   },
+
   progressFill: {
     width: "66%",
     height: "100%",
     backgroundColor: "#00834C",
     borderRadius: 10,
   },
+
   headerSpacer: {
     width: 42,
   },
@@ -263,6 +390,7 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
+
   content: {
     paddingHorizontal: 22,
     paddingTop: 14,
@@ -274,9 +402,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 20,
   },
+
   titleContainer: {
     flex: 1,
   },
+
   eyebrow: {
     color: "#00834C",
     fontSize: 10,
@@ -284,6 +414,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 9,
   },
+
   title: {
     fontSize: 32,
     lineHeight: 37,
@@ -291,9 +422,11 @@ const styles = StyleSheet.create({
     color: "#073B25",
     letterSpacing: -1,
   },
+
   titleAccent: {
     color: "#00834C",
   },
+
   subtitle: {
     fontSize: 13,
     lineHeight: 20,
@@ -301,6 +434,7 @@ const styles = StyleSheet.create({
     marginTop: 9,
     maxWidth: 260,
   },
+
   decorContainer: {
     width: 76,
     height: 90,
@@ -308,9 +442,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
+
   decorBear: {
     fontSize: 43,
   },
+
   star: {
     position: "absolute",
     color: "#F4B544",
@@ -318,6 +454,7 @@ const styles = StyleSheet.create({
     top: 0,
     right: 3,
   },
+
   decorDot: {
     position: "absolute",
     width: 9,
@@ -338,6 +475,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#DCEEDF",
   },
+
   helperIcon: {
     width: 35,
     height: 35,
@@ -347,6 +485,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 11,
   },
+
   helperText: {
     flex: 1,
     fontSize: 12,
@@ -358,12 +497,14 @@ const styles = StyleSheet.create({
   classList: {
     gap: 10,
   },
+
   sectionTitle: {
     color: "#073B25",
     fontSize: 16,
     fontWeight: "800",
     marginBottom: 3,
   },
+
   classItem: {
     minHeight: 72,
     borderRadius: 17,
@@ -375,11 +516,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
+
   selectedClassItem: {
     borderColor: "#00834C",
     backgroundColor: "#F0F9F1",
     borderWidth: 1.8,
   },
+
   animalContainer: {
     width: 52,
     height: 52,
@@ -390,31 +533,38 @@ const styles = StyleSheet.create({
     marginRight: 13,
     overflow: "hidden",
   },
+
   selectedAnimalContainer: {
     backgroundColor: "#DFF1E3",
   },
+
   animal: {
     width: 46,
     height: 46,
   },
+
   classInfo: {
     flex: 1,
     justifyContent: "center",
     gap: 4,
   },
+
   className: {
     fontSize: 14,
     fontWeight: "800",
     color: "#183C2B",
   },
+
   selectedClassName: {
     color: "#00834C",
   },
+
   classDescription: {
     fontSize: 10,
     color: "#929B94",
     fontWeight: "500",
   },
+
   radio: {
     width: 22,
     height: 22,
@@ -426,14 +576,54 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     marginLeft: 8,
   },
+
   radioSelected: {
     backgroundColor: "#00834C",
     borderColor: "#00834C",
   },
 
+  stateContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 35,
+    paddingHorizontal: 15,
+    gap: 12,
+  },
+
+  stateText: {
+    fontSize: 12,
+    color: "#829087",
+    textAlign: "center",
+  },
+
+  errorText: {
+    fontSize: 12,
+    color: "#B4533C",
+    textAlign: "center",
+    lineHeight: 19,
+  },
+
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: "#00834C",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+
+  retryText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
   bottomSpace: {
     height: 20,
   },
+
   bottomBar: {
     paddingHorizontal: 22,
     paddingTop: 11,
@@ -442,6 +632,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F0EAE1",
   },
+
   selectedHint: {
     fontSize: 11,
     color: "#78847B",
@@ -449,6 +640,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 9,
   },
+
   continueButton: {
     minHeight: 54,
     backgroundColor: "#00834C",
@@ -459,14 +651,17 @@ const styles = StyleSheet.create({
     position: "relative",
     paddingHorizontal: 20,
   },
+
   disabledButton: {
     backgroundColor: "#AABDB0",
   },
+
   continueText: {
     fontSize: 15,
     fontWeight: "800",
     color: "#FFFFFF",
   },
+
   arrowCircle: {
     width: 32,
     height: 32,
@@ -477,6 +672,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 11,
   },
+
   footerText: {
     color: "#9AA29B",
     fontSize: 10,

@@ -17,12 +17,20 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { images } from "../constants/images";
+import { useRegistration } from "../context/RegisterationContext";
 
 export default function StudentDetails() {
-  const [name, setName] = useState("");
+  const { setRegistration } = useRegistration();
+ const [firstName, setFirstName] = useState("");
+const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [profilePic, setProfilePic] = useState(null);
 
   const pickImage = async () => {
@@ -49,22 +57,38 @@ export default function StudentDetails() {
     }
   };
 
-  const handleContinue = () => {
-    if (!name.trim() || !email.trim() || !phone.trim() || !password) {
-      Alert.alert("Missing details", "Please fill in all fields.");
-      return;
-    }
+ const handleContinue = () =>{
+  if(!firstName.trim() || !lastName.trim() || !email.trim() || !phone.trim() || !password){
+    Alert.alert("Missing details", "Please fill in all fields.");
+    return;
+  }
 
-    router.push({
-      pathname: "/select-class",
-      params: {
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        profilePic: profilePic || "",
-      },
-    });
-  };
+  if (!/^[^\$@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())){
+    Alert.alert("Invalid email", "Please enter a valid email address");
+    return;
+  }
+
+  if(password.length < 8){
+    Alert.alert(
+      "Weak password",
+      "Your password must contain at least 8 characters."
+    );
+    return;
+
+  }
+
+
+  setRegistration({
+  firstName: firstName.trim(),
+  lastName: lastName.trim(),
+  email: email.trim().toLowerCase(),
+  phone: phone.trim(),
+  password,
+  profilePic,
+});
+
+  router.push("/select-class");
+ };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -128,17 +152,29 @@ export default function StudentDetails() {
 
           {/* Registration form */}
           <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color="#747B7B" />
-              <TextInput
-                style={styles.input}
-                placeholder="Child's Full Name"
-                placeholderTextColor="#777777"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-              />
-            </View>
+           <View style={styles.inputContainer}>
+  <Ionicons name="person-outline" size={20} color="#747B7B" />
+  <TextInput
+    style={styles.input}
+    placeholder="Child's First Name"
+    placeholderTextColor="#777777"
+    value={firstName}
+    onChangeText={setFirstName}
+    autoCapitalize="words"
+  />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Ionicons name="person-outline" size={20} color="#747B7B" />
+        <TextInput
+          style={styles.input}
+          placeholder="Child's Last Name"
+          placeholderTextColor="#777777"
+          value={lastName}
+          onChangeText={setLastName}
+          autoCapitalize="words"
+        />
+      </View>
 
             <View style={styles.inputContainer}>
               <Ionicons name="mail-outline" size={20} color="#747B7B" />
@@ -165,23 +201,56 @@ export default function StudentDetails() {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#747B7B" />
-              <TextInput
-                style={styles.input}
-                placeholder="Create a Password"
-                placeholderTextColor="#777777"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-              />
+          <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={20} color="#747B7B" />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Create a Password"
+                  placeholderTextColor="#777777"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                />
+
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={21}
+                    color="#747B7B"
+                  />
+                </TouchableOpacity>
             </View>
+
+            <View style={styles.inputContainer}>
+  <Ionicons name="lock-closed-outline" size={20} color="#747B7B" />
+
+  <TextInput
+    style={styles.input}
+    placeholder="Confirm Password"
+    placeholderTextColor="#777777"
+    value={confirmPassword}
+    onChangeText={setConfirmPassword}
+    secureTextEntry={!showConfirmPassword}
+    autoCapitalize="none"
+  />
+
+  <TouchableOpacity
+    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+  >
+    <Ionicons
+      name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+      size={21}
+      color="#747B7B"
+    />
+  </TouchableOpacity>
+</View>
           </View>
 
           <TouchableOpacity
             style={styles.button}
-            onPress={() => router.push("/select-class")}
+            onPress={handleContinue}
             activeOpacity={0.85}
           >
             <Text style={styles.buttonText}>Continue</Text>
