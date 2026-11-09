@@ -13,7 +13,12 @@ export async function apiRequest(path, options = {}) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+  const isFormData =
+    typeof FormData != "undeFined" &&
+    options.body instanceof FormData;
+
 
   try {
     const response = await fetch(
@@ -23,7 +28,7 @@ export async function apiRequest(path, options = {}) {
         signal: controller.signal,
         headers: {
           Accept: "application/json",
-          "Content-Type": "application/json",
+         ...(isFormData ? {} : { "Content-Type": "application/json",}),
           ...options.headers,
         },
       }
@@ -77,4 +82,57 @@ export async function loginUser(identifier, password) {
 
 export async function getClasses(){
   return apiRequest("/api/academics/classes");
+}
+
+export async function registerStudent(studentData){
+  return apiRequest("/api/auth/register/student", {
+    method: "POST",
+    body: JSON.stringify(studentData),
+  });
+}
+
+
+export async function uploadStudentProfileImage(imageUrl, accessToken) {
+  if (!imageUrl){
+    throw new Error("No profile picture was selected.");
+
+  }
+  if(!accessToken){
+    throw new Error("Authentication token is missing.");
+
+  }
+
+  const uriParts = imageUrl.split("/");
+  const originaName = uriParts[uriParts.length - 1] || "profile.jpg";
+  const extension = originaName
+  .split("?")[0]
+    .split(".")
+    .pop()
+    .toLowerCase();
+
+  const mimeTypes = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+  };
+
+  const mimeType = mimeTypes[extension] || "image/jpeg";
+
+  const formData = new FormData();
+
+  formData.append("file", {
+    uri: imageUri,
+    name: `profile.${mimeTypes[extension] ? extension : "jpg"}`,
+    type: mimeType,
+  });
+
+  return apiRequest("/api/students/me/profile-image", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: formData,
+  });
+  
 }

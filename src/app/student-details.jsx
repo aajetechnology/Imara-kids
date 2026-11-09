@@ -77,6 +77,14 @@ const [lastName, setLastName] = useState("");
 
   }
 
+  if (password !== confirmPassword){
+    Alert.alert(
+      "password mismatch",
+      "Your password do not match. Please try again"
+    );
+    return;
+  }
+
 
   setRegistration({
   firstName: firstName.trim(),

@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   StatusBar,
@@ -13,7 +15,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { images } from "../constants/images";
-import { getClasses } from "../services/api";
+import { useRegistration } from "../context/RegisterationContext";
+import { getClasses, registerStudent, uploadStudentProfileImage } from "../services/api";
+
 
 // Match backend class names to your existing local images.
 const classImages = {
@@ -27,12 +31,15 @@ const classImages = {
 };
 
 export default function SelectClassScreen() {
+  const { registration } = useRegistration();
+  const submissionLock = useRef(false);
   const router = useRouter();
   const params = useLocalSearchParams();
 
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState("");
 
   // Load classes from the backend.
@@ -80,24 +87,94 @@ export default function SelectClassScreen() {
   }, []);
 
   // Continue after selecting a class.
-  const handleContinue = () => {
-    if (!selectedClass) return;
+ const handleContinue = async () => {
+  if (submissionLock.current) return;
 
-    const chosenClass = classes.find(
-      (item) => item.id === selectedClass
+  if (!selectedClass) return;
+
+  const chosenClass = classes.find(
+    (item) => item.id === selectedClass
+  );
+
+  if (!chosenClass) return;
+
+  if (!registration) {
+    Alert.alert(
+      "Registration error",
+      "Student details are missing. Please go back and try again."
+    );
+    return;
+  }
+
+  submissionLock.current = true;
+  setIsSubmitting(true);
+
+  try {
+    const response = await registerStudent({
+      email: registration.email,
+      password: registration.password,
+      confirm_password: registration.password,
+      first_name: registration.firstName,
+      last_name: registration.lastName,
+      phone: registration.phone,
+      class_id: Number(chosenClass.id),
+    });
+
+    await SecureStore.setItemAsync(
+      "access_token",
+      response.access_token
     );
 
-    if (!chosenClass) return;
+    let imageUploadFailed = false;
+    if(registration.profilePic){
+      try{
+        await uploadStudentProfileImage(
+          registration.profilePic,
+          response.access_token
+        );
+        console.log("Profile profile uploaded successfully.");
 
-    router.push({
-      pathname: "/dashboard",
-      params: {
-        ...params,
-        classId: chosenClass.id,
-        className: chosenClass.name,
+      }catch(imageError){
+        console.error("profile picture upload failed:", imageError);
+        imageUploadFailed = true
+      }
+    }
+
+    const navigateToDashboard = () => {
+  router.replace({
+    pathname: "/dashboard",
+    params: {
+      ...params,
+      classId: chosenClass.id,
+      className: chosenClass.name,
+    },
+  });
+};
+
+if (imageUploadFailed) {
+  Alert.alert(
+    "Account created successfully",
+    "Your account is ready, but your profile picture could not be uploaded. You can try again from your profile.",
+    [
+      {
+        text: "Continue",
+        onPress: navigateToDashboard,
       },
-    });
-  };
+    ],
+    { cancelable: false }
+  );
+} else {
+  navigateToDashboard();
+}
+
+  } catch (error) {
+    Alert.alert("Registration failed", error.message);
+
+  } finally {
+    submissionLock.current = false;
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -311,10 +388,15 @@ export default function SelectClassScreen() {
               styles.disabledButton,
           ]}
           onPress={handleContinue}
-          disabled={!selectedClass || isLoading || !!loadError}
+          disabled={!selectedClass || isLoading || !!loadError || isSubmitting}
           activeOpacity={0.85}
         >
-          <Text style={styles.continueText}>Continue</Text>
+          {isSubmitting ? (
+            <ActivityIndicator color="#FFFFFF" />
+
+          ) : (
+            <Text style={styles.continueText}>Cotinue</Text>
+          )}
 
           <View style={styles.arrowCircle}>
             <Ionicons name="arrow-forward" size={17} color="#00834C" />

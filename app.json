@@ -32,7 +32,8 @@
           "image": "./assets/images/spl4.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
